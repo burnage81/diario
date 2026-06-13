@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0F1214"/>
+  <!-- contenuto entro la safe zone centrale (~center 80%) per il mascheramento adattivo -->
+  <rect x="146" y="336" width="220" height="11" rx="5.5" fill="#272F35"/>
+  <polyline points="158,312 214,286 270,242 354,196" fill="none" stroke="#E8A33D"
+            stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="158" cy="312" r="13" fill="#E8A33D"/>
+  <circle cx="214" cy="286" r="13" fill="#E8A33D"/>
+  <circle cx="270" cy="242" r="13" fill="#E8A33D"/>
+  <circle cx="354" cy="196" r="13" fill="#E8A33D"/>
+</svg>

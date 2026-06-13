@@ -1,0 +1,641 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta charset="utf-8">
+<title>Diario · Fase 1</title>
+<meta name="theme-color" content="#0F1214">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root{
+    --bg:#0F1214;            /* graphite, AMOLED-friendly */
+    --panel:#171C20;
+    --panel-2:#1E2429;
+    --line:#272F35;
+    --ink-0:#F1F4F3;         /* paper white — the numbers */
+    --ink-1:#9AA4AB;         /* muted slate */
+    --ink-2:#5E686F;         /* faint */
+    --active:#E8A33D;        /* the one accent: current set / in lavorazione */
+    --done:#3FB89E;          /* confirmed */
+    --danger:#E06A5B;
+    --r:16px;
+    --tap:52px;
+    --mono:'Roboto Mono',ui-monospace,'SF Mono','JetBrains Mono',Menlo,monospace;
+    --sans:system-ui,'Roboto','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink-0);font-family:var(--sans)}
+  body{padding-bottom:calc(64px + env(safe-area-inset-bottom));-webkit-user-select:none;user-select:none}
+  button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer}
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px}
+
+  /* ---- header ---- */
+  header{position:sticky;top:0;z-index:20;background:linear-gradient(var(--bg) 70%,rgba(15,18,20,0));padding:14px 0 8px}
+  .hrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .date{font-family:var(--mono);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-1)}
+  .gear{width:40px;height:40px;border-radius:11px;background:var(--panel);display:grid;place-items:center;color:var(--ink-1);font-size:17px}
+  .progress{display:flex;gap:5px;margin-top:10px;align-items:center}
+  .progress .seg{height:4px;flex:1;border-radius:99px;background:var(--line)}
+  .progress .seg.on{background:var(--done)}
+  .ptxt{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-left:8px;white-space:nowrap}
+
+  /* ---- exercise strip ---- */
+  .strip{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
+  .strip::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;min-height:var(--tap);display:flex;flex-direction:column;gap:5px;justify-content:center}
+  .chip.sel{border-color:var(--active);background:var(--panel-2)}
+  .chip .cn{font-size:12.5px;font-weight:600;white-space:nowrap;letter-spacing:.01em}
+  .chip.sel .cn{color:var(--ink-0)}
+  .chip:not(.sel) .cn{color:var(--ink-1)}
+  .dots{display:flex;gap:4px}
+  .dot{width:7px;height:7px;border-radius:99px;background:var(--line)}
+  .dot.d{background:var(--done)}
+  .dot.cur{background:var(--active)}
+  .tag{font-family:var(--mono);font-size:9px;padding:1px 4px;border-radius:5px;letter-spacing:.06em}
+  .tag.add{color:var(--active);border:1px solid color-mix(in srgb,var(--active) 45%,transparent)}
+  .tag.opz{color:var(--ink-2);border:1px solid var(--line)}
+
+  /* ---- collapsible warmup ---- */
+  .warm{width:100%;min-height:46px;margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:var(--panel);border:1px solid var(--line);border-radius:13px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--ink-1);text-transform:uppercase}
+  .warm .warmx{font-size:10px;color:var(--ink-2);letter-spacing:.1em}
+  .warmbody{margin-top:8px}
+
+  /* ---- reference content (warmup / mobilità / guida) ---- */
+  .refitem{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-top:8px}
+  .refitem .refname{font-size:14.5px;font-weight:600;color:var(--ink-0)}
+  .refitem .refmeta{font-family:var(--mono);font-size:11px;color:var(--active);letter-spacing:.04em;margin-top:3px}
+  .refitem .refbody{font-size:13px;color:var(--ink-1);line-height:1.5;margin-top:7px}
+  .refintro{font-size:13px;color:var(--ink-1);line-height:1.55;margin:10px 2px 4px}
+  .refcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-top:9px}
+  .refcard p{font-size:13px;color:var(--ink-1);line-height:1.55;margin:0 0 9px}
+  .refcard p:last-child{margin-bottom:0}
+  .refcard ol,.refcard ul{margin:0 0 4px;padding-left:18px}
+  .refcard li{font-size:13px;color:var(--ink-1);line-height:1.5;margin-bottom:6px}
+  .refcard b{color:var(--ink-0)}
+  .refcard.safe{border-left:3px solid var(--active)}
+
+  /* ---- semaforo ---- */
+  .sem{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink-1);line-height:1.45;margin-top:10px}
+  .sem .sd{width:12px;height:12px;border-radius:99px;flex:0 0 auto;margin-top:2px}
+  .sem .sd.g{background:var(--done)}
+  .sem .sd.y{background:var(--active)}
+  .sem .sd.r{background:var(--danger)}
+
+  /* ---- logger card ---- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 16px 16px;margin-top:12px}
+  .exhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .exname{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+  .infobtn{flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink-1);font-size:15px;display:grid;place-items:center}
+  .infobtn:active{transform:scale(.93)}
+  .extarget{font-family:var(--mono);font-size:12px;color:var(--ink-1);margin-top:5px;letter-spacing:.04em}
+  .exnote{font-size:12.5px;color:var(--ink-1);border-left:3px solid var(--active);padding-left:9px;margin-top:10px;line-height:1.4}
+
+  .metric{margin-top:20px}
+  .mlabel{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);margin-bottom:8px}
+  .readout{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .step{width:58px;height:58px;border-radius:15px;background:var(--panel-2);border:1px solid var(--line);font-size:26px;font-weight:300;color:var(--ink-0);display:grid;place-items:center;flex:0 0 auto;transition:transform .06s}
+  .step:active{transform:scale(.93)}
+  .num{flex:1;text-align:center;display:flex;align-items:baseline;justify-content:center;gap:6px;font-family:var(--mono);font-variant-numeric:tabular-nums;min-width:0}
+  .num .v{font-size:46px;font-weight:500;letter-spacing:-.02em;line-height:1}
+  .num .u{font-size:14px;color:var(--ink-1)}
+  .num.tap{cursor:text;position:relative;background:color-mix(in srgb,var(--panel-2) 55%,transparent);border:1px dashed color-mix(in srgb,var(--ink-2) 55%,transparent);border-radius:12px;padding:8px 4px}
+  .num .ed{position:absolute;top:2px;right:8px;font-size:11px;color:var(--ink-2)}
+  .numinput{width:140px;text-align:center;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:42px;font-weight:500;background:var(--panel-2);border:1px solid var(--active);border-radius:12px;color:var(--ink-0);padding:4px 0}
+
+  .rir{display:flex;gap:8px}
+  .rir b{flex:1;height:var(--tap);border-radius:13px;background:var(--panel-2);border:1px solid var(--line);font-family:var(--mono);font-size:18px;color:var(--ink-1);display:grid;place-items:center}
+  .rir b.on{background:color-mix(in srgb,var(--active) 18%,var(--panel-2));border-color:var(--active);color:var(--ink-0)}
+
+  .last{display:flex;align-items:center;gap:8px;margin-top:18px;font-family:var(--mono);font-size:12.5px;color:var(--ink-2)}
+  .last .lk{letter-spacing:.1em;text-transform:uppercase;font-size:10px}
+  .last .pr{color:var(--ink-1)}
+  .last .up{color:var(--done)}
+
+  .sets{display:flex;gap:8px;margin-top:16px}
+  .sset{flex:1;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px}
+  .sset.sel{border-color:var(--active)}
+  .sset.done{border-color:color-mix(in srgb,var(--done) 55%,transparent);background:color-mix(in srgb,var(--done) 10%,var(--panel-2))}
+  .sset .si{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--ink-2)}
+  .sset .sv{font-family:var(--mono);font-size:12px;color:var(--ink-1);font-variant-numeric:tabular-nums}
+  .sset.done .sv{color:var(--done)}
+
+  .confirm{width:100%;min-height:58px;margin-top:18px;border-radius:15px;background:var(--active);color:#1a1205;font-size:17px;font-weight:700;letter-spacing:.01em;display:flex;align-items:center;justify-content:center;gap:9px;transition:transform .06s,filter .15s}
+  .confirm:active{transform:scale(.985)}
+  .confirm.re{background:var(--panel-2);color:var(--ink-0);border:1px solid var(--done)}
+
+  /* ---- empty / start ---- */
+  .empty{margin-top:30px;text-align:center;padding:0 6px}
+  .empty h1{font-size:23px;font-weight:700;margin:0 0 6px}
+  .empty p{color:var(--ink-1);font-size:14px;line-height:1.5;margin:0 auto 26px;max-width:300px}
+  .bigbtn{display:inline-flex;align-items:center;gap:10px;background:var(--active);color:#1a1205;font-weight:700;font-size:16px;padding:16px 26px;border-radius:15px}
+  .ghosthint{font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-top:22px;letter-spacing:.03em}
+
+  /* ---- history ---- */
+  .htitle{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);margin:22px 2px 10px}
+  select{width:100%;min-height:var(--tap);background:var(--panel);color:var(--ink-0);border:1px solid var(--line);border-radius:13px;padding:0 14px;font-family:var(--sans);font-size:15px;appearance:none}
+  .spark{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+  .spark .sl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-bottom:8px;letter-spacing:.04em}
+  .hsess{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-top:9px}
+  .hsess .hd{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:12.5px;color:var(--ink-1);letter-spacing:.04em}
+  .hsess .hb{margin-top:9px;display:none}
+  .hsess.open .hb{display:block}
+  .hex{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+  .hex .hn{color:var(--ink-1)}
+  .hex .hv{font-family:var(--mono);font-size:12px;color:var(--ink-0);text-align:right;font-variant-numeric:tabular-nums}
+  .muted{color:var(--ink-2);font-size:13px;text-align:center;margin-top:30px;line-height:1.5}
+
+  /* ---- bottom nav ---- */
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  .nav-in{max-width:520px;margin:0 auto;display:flex}
+  .nav-in button{flex:1;height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-2);font-size:11px;letter-spacing:.04em}
+  .nav-in button .ni{font-size:19px;line-height:1}
+  .nav-in button.on{color:var(--ink-0)}
+  .nav-in button.on .ni{color:var(--active)}
+
+  /* ---- sheet (menu / info) ---- */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
+  .scrim.on{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--panel);border-radius:22px 22px 0 0;border-top:1px solid var(--line);padding:10px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .22s}
+  .sheet.on{transform:translateY(0)}
+  .sheet.tall{max-height:80vh;overflow-y:auto}
+  .grab{width:38px;height:4px;border-radius:99px;background:var(--line);margin:6px auto 14px}
+  .sheet h3{font-size:15px;margin:0 0 4px}
+  .mi{width:100%;min-height:54px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);font-size:15px;color:var(--ink-0);text-align:left}
+  .mi .mic{width:26px;text-align:center;color:var(--ink-1)}
+  .mi.dn{color:var(--danger)}
+  #infobody .ishead{font-size:19px;font-weight:700;margin:2px 0 4px;line-height:1.15}
+  #infobody .istarget{font-family:var(--mono);font-size:12px;color:var(--ink-1);letter-spacing:.04em}
+  #infobody .isnote{font-size:13px;color:var(--ink-1);border-left:3px solid var(--active);padding-left:10px;margin-top:12px;line-height:1.4}
+  #infobody p{font-size:13.5px;color:var(--ink-1);line-height:1.58;margin:13px 0 0}
+  .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--panel-2);border:1px solid var(--line);color:var(--ink-0);padding:11px 18px;border-radius:12px;font-size:13.5px;z-index:50;opacity:0;transition:.2s;pointer-events:none}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  .hidden{display:none!important}
+</style>
+
+<header>
+  <div class="wrap">
+    <div class="hrow">
+      <div class="date" id="hdate">—</div>
+      <button class="gear" id="gear" aria-label="Menu">⚙</button>
+    </div>
+    <div class="progress" id="prog"></div>
+  </div>
+</header>
+
+<main class="wrap" id="view"></main>
+
+<nav>
+  <div class="nav-in">
+    <button id="tab-oggi" class="on"><span class="ni">▦</span>Oggi</button>
+    <button id="tab-storico"><span class="ni">▤</span>Storico</button>
+    <button id="tab-guida"><span class="ni">▥</span>Guida</button>
+    <button id="tab-mobilita"><span class="ni">▧</span>Mobilità</button>
+  </div>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <h3>Seduta</h3>
+  <button class="mi" id="mi-finish"><span class="mic">✓</span>Termina seduta di oggi</button>
+  <button class="mi" id="mi-export"><span class="mic">↧</span>Esporta dati (backup)</button>
+  <button class="mi" id="mi-import"><span class="mic">↥</span>Importa dati</button>
+  <button class="mi dn" id="mi-reset"><span class="mic">⌫</span>Cancella tutto</button>
+  <input type="file" id="file" accept="application/json" class="hidden">
+</div>
+<div class="sheet tall" id="infosheet">
+  <div class="grab"></div>
+  <div id="infobody"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- config: la scheda Fase 1 (definitiva) ---------------- */
+const EXS = [
+  {id:'goblet', name:'Goblet Squat su Box', tag:'', sets:3, target:'10–12 rep', load:true, step:2.5, unit:'kg', rep:'rep', rir:true,
+   note:'Eccentrica 3 sec · scendi col bacino indietro, schiena dritta',
+   desc:['Manubrio o kettlebell in verticale appoggiato al petto, tenuto dai dischi/corni. Davanti al box/panca, petto in fuori. Scendi spingendo il bacino indietro e allargando le ginocchia in linea con le punte, 3 secondi a scendere. Quando i glutei sfiorano il box, pausa 1 secondo, poi spingi con i piedi e risali.',
+   'Perché: il carico frontale obbliga a tenere la colonna dritta (anti-cifosi) e non comprime le lombari. Il box standardizza la profondità.']},
+  {id:'hyper',  name:'Iperestensione a 45°', tag:'add', sets:2, target:'12–15 rep', load:true, step:1.25, unit:'kg', rep:'rep', rir:true,
+   note:'Parti a corpo libero · carico solo se indolore',
+   desc:['Sul banco a 45°, cuscino appena sotto le creste iliache (non sull’addome). Parti a corpo libero. Scendi flettendo dalle anche — non dalla schiena — colonna neutra, fino a circa 45°. Risali contraendo glutei e femorali, senza iperestendere oltre la linea del corpo. Tempo controllato.',
+   'Perché è stata aggiunta: allena la catena posteriore e il pattern di hinge a bassissima compressione assiale. Glutei e femorali forti sono protettivi per la zona lombare. È un hinge, non una flessione del rachide.',
+   'Cautela: carico al petto solo quando il movimento è indolore e padroneggiato. Se la lombare “parla”, riduci il ROM. Alternativa: Leg Curl seduto 2×12-15.']},
+  {id:'lat',    name:'Lat Machine presa neutra', tag:'', sets:3, target:'12–15 rep', load:true, step:2.5, unit:'kg', rep:'rep', rir:true,
+   note:'Presa neutra · rilascia in 3 sec senza farti strattonare',
+   desc:['Maniglia a triangolo o sbarra a maniglie parallele. Seduto, petto in fuori. Tira verso la parte alta del petto in 1 secondo chiudendo le scapole in basso. Rilascia in 3 secondi senza farti strattonare.',
+   'Perché: la presa neutra scarica quasi totalmente la tensione dall’epicondilo laterale e dalle spalle.']},
+  {id:'pushup', name:'Push-up su rialzo', tag:'', sets:3, target:'RIR 2 · gomiti 45°', load:false, rep:'rep', rir:true,
+   note:'Corpo in linea, addome teso · gomiti mai a “T”',
+   desc:['Mani sul bordo di una panca o sul bilanciere del Multipower (più alto = più facile). Corpo in linea, addome teso. Scendi fino a sfiorare il rialzo col petto. Gomiti stretti a circa 45° rispetto al busto, mai a “T”.',
+   'Perché: protegge la cuffia dei rotatori e riduce il carico sui tendini del gomito rispetto alle spinte pesanti col bilanciere.']},
+  {id:'row',    name:'Chest Supported Row', tag:'', sets:3, target:'12 rep', load:true, step:2, unit:'kg', rep:'rep', rir:true,
+   note:'Petto sostenuto · gomiti verso i fianchi, scendi in 3 sec',
+   desc:['Panca inclinata circa 30°, pancia in giù con petto e addome sostenuti. Due manubri presa neutra. Tira i gomiti indietro verso i fianchi, contrai le scapole, tieni 1 secondo, scendi in 3 secondi.',
+   'Perché: la panca azzera il ruolo stabilizzatore della lombare. Lavoro puro sul dorso, rischio zero per la schiena.']},
+  {id:'deadbug',name:'Dead Bug', tag:'', sets:3, target:'8 / lato', load:false, rep:'rep/lato', rir:false,
+   note:'Lombare schiacciata a terra · se si stacca, fermati prima',
+   desc:['Supino. Braccia tese al soffitto, gambe a 90°/90°. Spingi la lombare contro il pavimento. Allunga lentamente braccio e gamba controlaterali fino a sfiorare terra, torna, cambia lato. Se la schiena si stacca da terra, fermati prima.',
+   'Perché: attiva il core profondo (trasverso dell’addome), il “bustino” della colonna, senza flettere i dischi.']},
+  {id:'face',   name:'Face Pull', tag:'', sets:3, target:'15–20 rep', load:true, step:2.5, unit:'kg', rep:'rep', rir:false,
+   note:'Peso leggerissimo · postura',
+   desc:['Corda al cavo alto, pollici verso di te. Tira verso naso/occhi allargando le mani e spingendo indietro i gomiti. 1 secondo di contrazione dietro le spalle, ritorno in 2 secondi. Peso leggerissimo.',
+   'Perché: deltoidi posteriori e retrattori scapolari compensano la chiusura in avanti tipica del lavoro a terminale. È un esercizio posturale.']},
+  {id:'wre',    name:'Estensione di polso', tag:'add', sets:2, target:'15 rep · tempo 3-1-3', load:true, step:0.5, unit:'kg', rep:'rep', rir:false,
+   note:'Carico leggerissimo · se fa fastidio riduci, non sospendere',
+   desc:['Avambraccio appoggiato su panca o coscia, polso oltre il bordo, palmo verso il basso, manubrio leggerissimo. Estendi il polso in 3 secondi, tieni 1, scendi in 3.',
+   'Perché è stata aggiunta: rinforza attivamente gli estensori del polso. Le prese neutre proteggono il gomito ma non lo rinforzano. Il tendine guarito diventa più resistente se caricato in modo progressivo e mirato, non se solo evitato. Carico molto leggero: l’obiettivo è lo stimolo al collagene, non la fatica. Se compare fastidio, riduci il carico ma non sospendere.']},
+  {id:'wiso',   name:'Isometria estensori polso', tag:'add', sets:3, target:'30–45 sec', load:false, rep:'sec', rir:false,
+   note:'Tenuta costante, niente strappi',
+   desc:['Tieni il polso in estensione contro una resistenza leggera (o flexbar) per 30-45 secondi, avambraccio appoggiato, palmo verso il basso.',
+   'Perché: il carico isometrico è tra gli stimoli meglio documentati per la tendinopatia epicondilea. Completa il lavoro dinamico di estensione del polso. Tenuta costante, senza strappi.']},
+  {id:'lateral',name:'Alzate laterali', tag:'opz', sets:2, target:'15 rep · leggere', load:true, step:1, unit:'kg', rep:'rep', rir:false,
+   note:'Molto leggere · conduci il movimento coi gomiti',
+   desc:['Manubri molto leggeri, in piedi. Solleva le braccia lateralmente fino all’altezza delle spalle, gomito leggermente flesso, conduci il movimento con i gomiti. Salita controllata, discesa lenta.',
+   'Perché: deltoide laterale, utile in ottica ipertrofia futura della spalla. Opzionale: è la prima cosa da togliere se sei a corto di tempo.']},
+  {id:'triceps',name:'Triceps pushdown elastico', tag:'opz', sets:2, target:'15–20 rep', load:false, rep:'rep', rir:false,
+   note:'Lento, soprattutto in risalita',
+   desc:['Elastico ancorato in alto, gomiti ai fianchi fermi. Estendi gli avambracci verso il basso, lento e controllato, soprattutto nel ritorno.',
+   'Perché: lavoro complementare sul tricipite a bassissimo carico articolare. Opzionale.']},
+];
+const EXMAP = Object.fromEntries(EXS.map(e=>[e.id,e]));
+const CORE = EXS.filter(e=>e.tag!=='opz').map(e=>e.id); // per il calcolo "seduta completata"
+
+/* ---------------- contenuti di consultazione (sola lettura) ---------------- */
+const WARM_DUR='10-12′';
+const WARMUP=[
+  {name:'Respirazione diaframmatica', dur:'2 min', how:'Supino, ginocchia piegate. Mani sulla pancia: inspira gonfiando l’addome (non il petto), espira sgonfiandolo.'},
+  {name:'Cat-Cow (Gatto-Mucca)', dur:'10 rip', how:'A carponi. Inspira inarcando la schiena e guardando avanti; espira arrotondando la colonna verso il soffitto. Fluido e lento.'},
+  {name:'Book Opener', dur:'8 / lato', how:'Sul fianco, ginocchia a 90°, mani sovrapposte avanti. Apri il braccio superiore “a libro” cercando il pavimento dietro di te. Segui la mano con lo sguardo.'},
+  {name:'Glute Bridge', dur:'15 rip', how:'Supino, ginocchia piegate, piedi a terra. Contrai i glutei e solleva il bacino, 1 secondo in massima contrazione, scendi.'},
+  {name:'Y-T-W a corpo libero', dur:'10 / lettera', how:'In piedi, busto leggermente flesso, schiena dritta. Braccia a formare una Y, poi una T, poi una W. Contrai forte le scapole a ogni movimento.'},
+];
+const MOBILITY=[
+  {name:'Posizione del bambino con allungo laterale', dur:'60 sec'},
+  {name:'Cat-camel (gatto-cammello)', dur:'10 cicli lenti'},
+  {name:'90/90 anche con rotazioni', dur:'8 / lato'},
+  {name:'Apertura toracica su foam roller', dur:'60 sec'},
+  {name:'Scapular wall slides (slittamenti al muro)', dur:'10 rip'},
+  {name:'Allungo flessori dell’anca in affondo', dur:'45 sec / lato'},
+];
+
+/* ---------------- storage wrapper (window.storage, no localStorage) ---------------- */
+const KEY='diariofase1:v1';
+const store={
+  mem:null,
+  async load(){
+    // Dentro Claude.ai: window.storage. Fuori (telefono / browser normale): localStorage. Mai entrambi.
+    if(window.storage){
+      try{ const r=await window.storage.get(KEY,false); return r&&r.value?JSON.parse(r.value):null; }
+      catch(e){ return this.mem; }
+    }
+    try{ const s=localStorage.getItem(KEY); if(s) return JSON.parse(s); }catch(e){}
+    return this.mem;
+  },
+  async save(obj){
+    const s=JSON.stringify(obj); this.mem=obj;
+    if(window.storage){ try{ await window.storage.set(KEY,s,false); }catch(e){} return; }
+    try{ localStorage.setItem(KEY,s); }catch(e){}
+  }
+};
+
+/* ---------------- state ---------------- */
+let state={sessions:[]};                 // {id,date(ISO),log:{exId:[{l,r,rir,done}]},done}
+let ui={tab:'oggi', exId:EXS[0].id, setIx:{}, editing:null, warmOpen:false};
+
+function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function curSession(){ const t=todayKey(); return state.sessions.find(s=>s.date===t)||null; }
+function fmt(n){ if(n===null||n===undefined||n==='') return '—'; return String(n).replace('.',','); }
+function dShort(iso){ const d=new Date(iso+'T00:00'); return d.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'}); }
+
+function lastValue(exId,ix){ // ultimo valore loggato per quell'esercizio/serie nelle sedute passate
+  const t=todayKey();
+  for(let i=state.sessions.length-1;i>=0;i--){ const s=state.sessions[i];
+    if(s.date===t) continue;
+    const arr=s.log[exId]; if(arr&&arr[ix]&&arr[ix].done) return arr[ix];
+  }
+  return null;
+}
+function startSession(){
+  const ex={}; EXS.forEach(e=>{
+    ex[e.id]=Array.from({length:e.sets},(_,i)=>{
+      const lv=lastValue(e.id,i);
+      return {l:lv?lv.l:(e.load?0:null), r:lv?lv.r:'', rir:lv?lv.rir:(e.rir?2:null), done:false};
+    });
+  });
+  state.sessions.push({id:Date.now(),date:todayKey(),log:ex,done:false});
+  ui.exId=EXS[0].id; ui.setIx={};
+  persist(); render();
+}
+function persist(){ store.save(state); }
+
+/* ---------------- progress ---------------- */
+function exDone(s,id){ const a=s.log[id]||[]; return a.filter(x=>x.done).length; }
+function renderProgress(){
+  const s=curSession(); const wrap=document.getElementById('prog');
+  if(!s){ wrap.innerHTML=''; return; }
+  let total=0,done=0; CORE.forEach(id=>{ total+=EXMAP[id].sets; done+=exDone(s,id); });
+  let segs=''; for(let i=0;i<total;i++) segs+=`<div class="seg ${i<done?'on':''}"></div>`;
+  wrap.innerHTML=segs+`<span class="ptxt">${done}/${total} serie</span>`;
+}
+
+/* ---------------- render: OGGI ---------------- */
+function curSetIx(id){
+  if(ui.setIx[id]!=null) return ui.setIx[id];
+  const s=curSession(); const a=s.log[id]; const i=a.findIndex(x=>!x.done);
+  return i===-1?a.length-1:i;
+}
+function warmupHTML(){
+  const items=WARMUP.map(w=>`<div class="refitem"><div class="refname">${w.name}</div><div class="refmeta">${w.dur}</div><div class="refbody">${w.how}</div></div>`).join('');
+  return `<button class="warm" id="warmtoggle"><span>${ui.warmOpen?'▾':'▸'} Riscaldamento · ${WARM_DUR}</span><span class="warmx">${ui.warmOpen?'NASCONDI':'APRI'}</span></button>
+    <div class="warmbody ${ui.warmOpen?'':'hidden'}">${items}</div>`;
+}
+function renderOggi(){
+  const s=curSession(); const v=document.getElementById('view');
+  if(!s){
+    v.innerHTML=warmupHTML()+`<div class="empty">
+      <h1>Pronto per la seduta</h1>
+      <p>Full-body Fase 1. I valori partono già da quelli dell'ultima volta: ti basta ritoccarli e confermare ogni serie.</p>
+      <button class="bigbtn" id="start">▶ Inizia la seduta di oggi</button>
+      <div class="ghosthint">3 giorni · max 75′ · RIR 2-3 · eccentrica lenta</div>
+    </div>`;
+    bindWarm();
+    document.getElementById('start').onclick=startSession; return;
+  }
+  // strip
+  let strip='';
+  EXS.forEach(e=>{
+    const a=s.log[e.id]; const cs=curSetIx(e.id);
+    let dots=''; a.forEach((x,i)=>{ dots+=`<div class="dot ${x.done?'d':(e.id===ui.exId&&i===cs?'cur':'')}"></div>`; });
+    const tg=e.tag?`<span class="tag ${e.tag==='add'?'add':'opz'}">${e.tag==='add'?'+':'opz'}</span>`:'';
+    strip+=`<button class="chip ${e.id===ui.exId?'sel':''}" data-ex="${e.id}">
+      <span class="cn">${e.name}${tg?' ':''}${tg}</span><span class="dots">${dots}</span></button>`;
+  });
+  const e=EXMAP[ui.exId]; const a=s.log[ui.exId]; const ix=curSetIx(ui.exId); const cell=a[ix];
+  const lv=lastValue(ui.exId,ix);
+
+  // metrics
+  let metrics='';
+  if(e.load){
+    metrics+=`<div class="metric"><div class="mlabel">Carico</div><div class="readout">
+      <button class="step" data-act="l-" >−</button>
+      <div class="num tap" data-edit="l"><span class="v">${fmt(cell.l)}</span><span class="u">${e.unit}</span><span class="ed">✎</span></div>
+      <button class="step" data-act="l+">+</button></div></div>`;
+  }
+  metrics+=`<div class="metric"><div class="mlabel">${e.rep}</div><div class="readout">
+      <button class="step" data-act="r-">−</button>
+      <div class="num tap" data-edit="r"><span class="v">${fmt(cell.r)}</span><span class="ed">✎</span></div>
+      <button class="step" data-act="r+">+</button></div></div>`;
+  if(e.rir){
+    let chips=''; for(let k=0;k<=4;k++) chips+=`<b class="${cell.rir===k?'on':''}" data-rir="${k}">${k}</b>`;
+    metrics+=`<div class="metric"><div class="mlabel">RIR</div><div class="rir">${chips}</div></div>`;
+  }
+  // last
+  let last='';
+  if(lv){
+    const up=e.load&&cell.l!==''&&Number(cell.l)>Number(lv.l);
+    last=`<div class="last"><span class="lk">Ultima</span><span class="pr">${e.load?fmt(lv.l)+' '+e.unit+' · ':''}${fmt(lv.r)} ${e.rep}${e.rir?' · RIR '+lv.rir:''}</span>${up?'<span class="up">▲</span>':''}</div>`;
+  } else {
+    last=`<div class="last"><span class="lk">Ultima</span><span class="pr">prima volta su questo esercizio</span></div>`;
+  }
+  // set chips
+  let sc='';
+  a.forEach((x,i)=>{
+    const lab=e.load?(x.done?fmt(x.l)+'·'+fmt(x.r):'—'):(x.done?fmt(x.r):'—');
+    sc+=`<button class="sset ${i===ix?'sel':''} ${x.done?'done':''}" data-set="${i}">
+      <span class="si">S${i+1}</span><span class="sv">${lab}</span></button>`;
+  });
+  const done=cell.done;
+  const total=e.sets;
+  v.innerHTML=warmupHTML()+`<div class="strip">${strip}</div>
+    <div class="card">
+      <div class="exhead">
+        <div class="exname">${e.name}</div>
+        <button class="infobtn" id="exinfo" aria-label="Come si esegue">ⓘ</button>
+      </div>
+      <div class="extarget">obiettivo ${e.target}</div>
+      ${e.note?`<div class="exnote">${e.note}</div>`:''}
+      ${metrics}
+      ${last}
+      <div class="sets">${sc}</div>
+      <button class="confirm ${done?'re':''}" id="confirm">${done?'↻ Aggiorna serie '+(ix+1):'✓ Segna serie '+(ix+1)+'/'+total}</button>
+    </div>`;
+  bindOggi();
+}
+
+function bindWarm(){
+  const wt=document.getElementById('warmtoggle');
+  if(wt) wt.onclick=()=>{ ui.warmOpen=!ui.warmOpen; render(); };
+}
+function bindOggi(){
+  bindWarm();
+  document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ui.exId=c.dataset.ex; render();});
+  document.querySelectorAll('.sset').forEach(b=>b.onclick=()=>{ui.setIx[ui.exId]=+b.dataset.set; render();});
+  document.querySelectorAll('.step').forEach(b=>b.onclick=()=>stepVal(b.dataset.act));
+  document.querySelectorAll('.rir b').forEach(b=>b.onclick=()=>{ setCell({rir:+b.dataset.rir}); render(); });
+  document.querySelectorAll('.num.tap').forEach(n=>n.onclick=()=>openEdit(n.dataset.edit));
+  const inf=document.getElementById('exinfo'); if(inf) inf.onclick=()=>openInfo(ui.exId);
+  document.getElementById('confirm').onclick=confirmSet;
+}
+function setCell(patch){ const s=curSession(); const ix=curSetIx(ui.exId); Object.assign(s.log[ui.exId][ix],patch); persist(); }
+function stepVal(act){
+  const e=EXMAP[ui.exId]; const s=curSession(); const ix=curSetIx(ui.exId); const c=s.log[ui.exId][ix];
+  if(act==='l+'||act==='l-'){ let val=Number(c.l)||0; val+= (act==='l+'?e.step:-e.step); if(val<0)val=0; c.l=Math.round(val*100)/100; }
+  if(act==='r+'||act==='r-'){ let val=Number(c.r)||0; val+= (act==='r+'?1:-1); if(val<0)val=0; c.r=val; }
+  persist(); render();
+}
+function openEdit(field){
+  const e=EXMAP[ui.exId]; const s=curSession(); const ix=curSetIx(ui.exId); const c=s.log[ui.exId][ix];
+  const numEl=document.querySelector(`.num[data-edit="${field}"]`); if(!numEl) return;
+  const cur=field==='l'?c.l:c.r;
+  numEl.innerHTML=`<input class="numinput" type="number" inputmode="decimal" value="${cur===''?'':cur}" step="${field==='l'?e.step:1}">`;
+  const inp=numEl.querySelector('input'); inp.focus(); inp.select();
+  const commit=()=>{ let v=inp.value.replace(',','.'); v=v===''?'':Math.max(0,Number(v)); if(field==='l')c.l=v; else c.r=v; persist(); render(); };
+  inp.onblur=commit; inp.onkeydown=ev=>{ if(ev.key==='Enter') inp.blur(); };
+}
+function confirmSet(){
+  const s=curSession(); const e=EXMAP[ui.exId]; const ix=curSetIx(ui.exId); const c=s.log[ui.exId][ix];
+  c.done=!c.done; persist();
+  if(c.done){
+    // avanza alla prossima serie da fare; se l'esercizio è finito, al prossimo esercizio incompleto
+    const a=s.log[ui.exId]; const nxt=a.findIndex((x,i)=>i>ix&&!x.done);
+    if(nxt!==-1){ ui.setIx[ui.exId]=nxt; }
+    else {
+      const order=EXS.map(x=>x.id); const start=order.indexOf(ui.exId);
+      let moved=false;
+      for(let k=1;k<=order.length;k++){ const id=order[(start+k)%order.length];
+        if(EXMAP[id].tag==='opz') continue;
+        if((s.log[id]||[]).some(x=>!x.done)){ ui.exId=id; ui.setIx={}; moved=true; break; } }
+      if(!moved){ ui.setIx[ui.exId]=ix; } // tutto fatto: resta qui
+    }
+    toast('Serie registrata');
+  }
+  render();
+}
+
+/* ---------------- render: STORICO ---------------- */
+function topSet(s,id){ const a=s.log[id]||[]; const d=a.filter(x=>x.done); if(!d.length)return null;
+  const e=EXMAP[id];
+  return d.reduce((b,x)=> (e.load? (Number(x.l)>Number(b.l)?x:b) : (Number(x.r)>Number(b.r)?x:b)) , d[0]); }
+function renderStorico(){
+  const v=document.getElementById('view');
+  const sess=[...state.sessions].filter(s=>Object.values(s.log).some(a=>a.some(x=>x.done)));
+  if(!sess.length){ v.innerHTML=`<div class="muted">Ancora nessuna serie registrata.<br>I tuoi progressi compariranno qui dopo la prima seduta.</div>`; return; }
+  const exId=ui.histEx||EXS[0].id;
+  // sparkline su top set dell'esercizio scelto
+  const pts=sess.filter(s=>topSet(s,exId)).map(s=>({d:s.date, v:Number((topSet(s,exId)||{}).l||topSet(s,exId).r)}));
+  const e=EXMAP[exId];
+  let opts=EXS.map(x=>`<option value="${x.id}" ${x.id===exId?'selected':''}>${x.name}</option>`).join('');
+  let spark='';
+  if(pts.length>=1){
+    const W=300,H=64,pad=6; const vs=pts.map(p=>p.v); const mn=Math.min(...vs),mx=Math.max(...vs);
+    const x=i=>pad+(pts.length<2?W/2:(i*(W-2*pad)/(pts.length-1)));
+    const y=val=>{ if(mx===mn)return H/2; return H-pad-((val-mn)/(mx-mn))*(H-2*pad); };
+    const line=pts.map((p,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+    const dotsSvg=pts.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3" fill="var(--active)"/>`).join('');
+    spark=`<div class="spark"><div class="sl"><span>${e.load?'carico top (kg)':'rip. top'}</span><span>${fmt(pts[0].v)} → ${fmt(pts[pts.length-1].v)}</span></div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none">
+        <path d="${line}" fill="none" stroke="var(--active)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dotsSvg}</svg></div>`;
+  } else spark=`<div class="spark"><div class="sl"><span>nessun dato per questo esercizio</span></div></div>`;
+
+  let list='';
+  [...sess].reverse().forEach(s=>{
+    let total=0,done=0; CORE.forEach(id=>{ total+=EXMAP[id].sets; done+=exDone(s,id); });
+    let body='';
+    EXS.forEach(x=>{ const a=s.log[x.id]||[]; const d=a.filter(z=>z.done); if(!d.length)return;
+      const ex=EXMAP[x.id];
+      const vals=d.map(z=> ex.load? `${fmt(z.l)}×${fmt(z.r)}${ex.rir?'@'+z.rir:''}` : `${fmt(z.r)}${ex.rir?'@'+z.rir:''}`).join('  ');
+      body+=`<div class="hex"><span class="hn">${x.name}</span><span class="hv">${vals}</span></div>`; });
+    list+=`<div class="hsess" data-sess="${s.id}"><div class="hd"><span>${dShort(s.date)}</span><span>${done}/${total} serie ›</span></div><div class="hb">${body}</div></div>`;
+  });
+
+  v.innerHTML=`<div class="htitle">Progressione</div>
+    <select id="histsel">${opts}</select>${spark}
+    <div class="htitle">Sedute</div>${list}`;
+  document.getElementById('histsel').onchange=ev=>{ui.histEx=ev.target.value; render();};
+  document.querySelectorAll('.hsess').forEach(h=>h.onclick=()=>h.classList.toggle('open'));
+}
+
+/* ---------------- render: GUIDA ---------------- */
+function renderGuida(){
+  const v=document.getElementById('view');
+  v.innerHTML=`
+    <div class="htitle">Fase 1 · Panoramica</div>
+    <div class="refcard">
+      <p><b>Chi:</b> uomo, 45 anni, rientro dopo ~2,5 anni di stop su 8 anni di esperienza.</p>
+      <p><b>Struttura:</b> sessione unica full-body, ripetuta 3×/settimana a giorni alterni, max 75′ a seduta (riscaldamento e stretching inclusi).</p>
+      <p><b>Obiettivo:</b> rinforzo, funzionalità e mobilità ora; ipertrofia nel lungo periodo. Focus su protezione di gomiti e schiena.</p>
+      <p><b>Parametri:</b> RIR 2-3 (in Fase 1 <b>non</b> si va a cedimento), tempi lenti, eccentrica ≈3 sec sui pattern che coinvolgono il gomito.</p>
+    </div>
+
+    <div class="htitle">Come progredire · doppia progressione</div>
+    <div class="refcard">
+      <p>Il criterio per aumentare il carico nel tempo, misurabile e non “a sensazione”:</p>
+      <ol>
+        <li>Lavora dentro il range di ripetizioni indicato (es. 10-12), al RIR previsto.</li>
+        <li>Ogni seduta prova ad aggiungere ripetizioni mantenendo tecnica e tempo.</li>
+        <li>Quando raggiungi il numero alto del range <b>su tutte le serie con tecnica pulita</b>, aumenta il carico del minimo incremento disponibile e riparti dal fondo del range.</li>
+      </ol>
+      <p>Non aumentare se la tecnica peggiora o se gomiti/schiena ti “parlano”. È esattamente ciò che questo diario serve a misurare: carico × serie × rip × RIR, più nota dolore.</p>
+    </div>
+
+    <div class="htitle">Quando passare alla Fase 2 · ipertrofia</div>
+    <div class="refcard">
+      <p><b>Passa alla Fase 2 quando, per ~8 settimane:</b> ti alleni senza dolore a gomiti e schiena, la tecnica è solida ovunque, e hai progredito stabilmente di carico con la doppia progressione.</p>
+      <p><b>Cosa cambia in Fase 2 (non prima):</b></p>
+      <ul>
+        <li><b>Volume:</b> 3-4 serie per esercizio → ~12-18 serie/gruppo/settimana.</li>
+        <li><b>Intensità:</b> più vicino al cedimento (RIR 1-3) sugli esercizi sicuri; RIR 2-3 sui multiarticolari.</li>
+        <li><b>Carichi assiali (graduali, uno alla volta):</b> RDL leggero → squat con bilanciere, valuta la safety bar.</li>
+        <li><b>Tempo:</b> eccentrica accorciabile a 2 sec, sempre controllata.</li>
+      </ul>
+    </div>
+
+    <div class="htitle">Regole di sicurezza · semaforo del dolore</div>
+    <div class="refcard">
+      <div class="sem"><span class="sd g"></span><div><b>Verde 0-3/10</b> che non peggiora → prosegui.</div></div>
+      <div class="sem"><span class="sd y"></span><div><b>Giallo 4-5/10</b> → riduci carico/ROM e monitora.</div></div>
+      <div class="sem"><span class="sd r"></span><div><b>Rosso &gt;5/10</b>, o dolore che cresce nelle 24-48h → stop sull’esercizio, sostituisci, valuta un consulto.</div></div>
+    </div>
+    <div class="refcard">
+      <p><b>Regole d’oro di questa fase:</b></p>
+      <ul>
+        <li>Ascolta i tendini: un leggero fastidio muscolare è ok; un dolore puntiforme ai gomiti o alla colonna dice di abbassare il peso o ridurre il ROM.</li>
+        <li>Sii maniacale sul tempo: i 3 secondi di discesa sono la tua “terapia” preventiva per i gomiti.</li>
+        <li>Gomiti: prese neutre/martello e carico mirato sugli estensori del polso a fine seduta. Se compare fastidio tendineo, riduci il carico ma non sospendere.</li>
+      </ul>
+      <p class="muted" style="text-align:left;margin-top:4px">Programma educativo su principi di scienza dell’allenamento, non un piano riabilitativo medico. Per dolori nuovi o persistenti, fermati e fai rivalutare.</p>
+    </div>`;
+}
+
+/* ---------------- render: MOBILITÀ ---------------- */
+function renderMobilita(){
+  const v=document.getElementById('view');
+  const items=MOBILITY.map(w=>`<div class="refitem"><div class="refname">${w.name}</div><div class="refmeta">${w.dur}</div></div>`).join('');
+  v.innerHTML=`
+    <div class="htitle">Mobilità come obiettivo</div>
+    <p class="refintro">La mobilità migliora con l’<b>esposizione frequente</b>, non con sessioni occasionali. Routine da casa: <b>8-10 min, 3-5×/settimana</b>, nei giorni off o la sera. Solo consultazione — non si registra qui.</p>
+    ${items}
+
+    <div class="htitle">Cervicale · micro-pause al terminale</div>
+    <div class="refcard">
+      <p>Ogni 45-60′ di lavoro: <b>10 chin tuck + 5 retrazioni scapolari</b>. Banale, ma è la singola cosa più efficace contro la cervicalgia posturale.</p>
+    </div>
+
+    <div class="htitle">Note di sicurezza</div>
+    <div class="refcard safe">
+      <ul>
+        <li>Stretch sempre <b>lieve</b>, mai dolore (vale il semaforo del dolore della Guida).</li>
+        <li>Sugli <b>scapular wall slides</b> fermati dove la spalla è comoda: ROM indolore.</li>
+        <li>Senza <b>foam roller</b>: usa un asciugamano arrotolato sotto la colonna o l’apertura sullo spigolo di una porta.</li>
+        <li>Il cat-camel è lo stesso movimento del riscaldamento in palestra: ripeterlo va benissimo, l’esposizione frequente è un pregio.</li>
+      </ul>
+    </div>`;
+}
+
+/* ---------------- render root ---------------- */
+function render(){
+  document.getElementById('hdate').textContent = curSession()? dShort(todayKey())+' · Seduta' : dShort(todayKey());
+  ['oggi','storico','guida','mobilita'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('on',ui.tab===t));
+  renderProgress();
+  if(ui.tab==='oggi') renderOggi();
+  else if(ui.tab==='storico') renderStorico();
+  else if(ui.tab==='guida') renderGuida();
+  else renderMobilita();
+}
+
+/* ---------------- menu / info / data ---------------- */
+const scrim=document.getElementById('scrim'), sheet=document.getElementById('sheet'), infosheet=document.getElementById('infosheet');
+function closeSheet(){ scrim.classList.remove('on'); sheet.classList.remove('on'); infosheet.classList.remove('on'); }
+function openMenu(){ infosheet.classList.remove('on'); scrim.classList.add('on'); sheet.classList.add('on'); }
+function openInfo(exId){
+  const e=EXMAP[exId]; const body=document.getElementById('infobody');
+  const paras=(e.desc||[]).map(p=>`<p>${p}</p>`).join('');
+  body.innerHTML=`<div class="ishead">${e.name}</div><div class="istarget">obiettivo ${e.target}</div>`+
+    (e.note?`<div class="isnote">${e.note}</div>`:'')+(paras||'<p class="muted">Descrizione non disponibile.</p>');
+  sheet.classList.remove('on'); scrim.classList.add('on'); infosheet.classList.add('on');
+}
+document.getElementById('gear').onclick=openMenu; scrim.onclick=closeSheet;
+document.getElementById('mi-finish').onclick=()=>{ const s=curSession(); if(s)s.done=true; persist(); closeSheet(); toast('Seduta archiviata'); render(); };
+document.getElementById('mi-export').onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='diario-palestra-'+todayKey()+'.json'; a.click(); URL.revokeObjectURL(a.href); closeSheet(); toast('Backup scaricato');
+};
+document.getElementById('mi-import').onclick=()=>document.getElementById('file').click();
+document.getElementById('file').onchange=ev=>{ const f=ev.target.files[0]; if(!f)return;
+  const rd=new FileReader(); rd.onload=()=>{ try{ const o=JSON.parse(rd.result); if(o&&Array.isArray(o.sessions)){ state=o; persist(); closeSheet(); toast('Dati importati'); render(); } else toast('File non valido'); }catch(e){ toast('File non valido'); } }; rd.readAsText(f); };
+document.getElementById('mi-reset').onclick=()=>{ if(confirm('Cancellare tutte le sedute registrate? L’azione non è reversibile.')){ state={sessions:[]}; ui.setIx={}; persist(); closeSheet(); toast('Dati cancellati'); render(); } };
+
+let tt; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),1600); }
+
+['oggi','storico','guida','mobilita'].forEach(t=>{ document.getElementById('tab-'+t).onclick=()=>{ ui.tab=t; window.scrollTo(0,0); render(); }; });
+
+/* ---------------- boot ---------------- */
+(async()=>{ const saved=await store.load(); if(saved&&Array.isArray(saved.sessions)) state=saved; render(); })();
+
+/* ---------------- PWA: service worker (solo standalone via http/https, fuori da Claude) ---------------- */
+if(location.protocol.startsWith('http') && 'serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
