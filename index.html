@@ -241,14 +241,6 @@ const EXS = [
    note:'Peso leggerissimo · postura',
    desc:['Corda al cavo alto, pollici verso di te. Tira verso naso/occhi allargando le mani e spingendo indietro i gomiti. 1 secondo di contrazione dietro le spalle, ritorno in 2 secondi. Peso leggerissimo.',
    'Perché: deltoidi posteriori e retrattori scapolari compensano la chiusura in avanti tipica del lavoro a terminale. È un esercizio posturale.']},
-  {id:'wre',    name:'Estensione di polso', tag:'add', sets:2, target:'15 rep · tempo 3-1-3', load:true, step:0.5, unit:'kg', rep:'rep', rir:false,
-   note:'Carico leggerissimo · se fa fastidio riduci, non sospendere',
-   desc:['Avambraccio appoggiato su panca o coscia, polso oltre il bordo, palmo verso il basso, manubrio leggerissimo. Estendi il polso in 3 secondi, tieni 1, scendi in 3.',
-   'Perché è stata aggiunta: rinforza attivamente gli estensori del polso. Le prese neutre proteggono il gomito ma non lo rinforzano. Il tendine guarito diventa più resistente se caricato in modo progressivo e mirato, non se solo evitato. Carico molto leggero: l’obiettivo è lo stimolo al collagene, non la fatica. Se compare fastidio, riduci il carico ma non sospendere.']},
-  {id:'wiso',   name:'Isometria estensori polso', tag:'add', sets:3, target:'30–45 sec', load:false, rep:'sec', rir:false,
-   note:'Tenuta costante, niente strappi',
-   desc:['Tieni il polso in estensione contro una resistenza leggera (o flexbar) per 30-45 secondi, avambraccio appoggiato, palmo verso il basso.',
-   'Perché: il carico isometrico è tra gli stimoli meglio documentati per la tendinopatia epicondilea. Completa il lavoro dinamico di estensione del polso. Tenuta costante, senza strappi.']},
   {id:'lateral',name:'Alzate laterali', tag:'opz', sets:2, target:'15 rep · leggere', load:true, step:1, unit:'kg', rep:'rep', rir:false,
    note:'Molto leggere · conduci il movimento coi gomiti',
    desc:['Manubri molto leggeri, in piedi. Solleva le braccia lateralmente fino all’altezza delle spalle, gomito leggermente flesso, conduci il movimento con i gomiti. Salita controllata, discesa lenta.',
@@ -277,6 +269,10 @@ const MOBILITY=[
   {name:'Apertura toracica su foam roller', dur:'60 sec'},
   {name:'Scapular wall slides (slittamenti al muro)', dur:'10 rip'},
   {name:'Allungo flessori dell’anca in affondo', dur:'45 sec / lato'},
+];
+const WRIST=[
+  {name:'Estensione di polso', dur:'2×15 · tempo 3-1-3', how:'Avambraccio appoggiato su panca o coscia, polso oltre il bordo, palmo verso il basso, peso/manubrio leggerissimo. Estendi il polso in 3 secondi, tieni 1, scendi in 3. L’obiettivo è lo stimolo al collagene, non la fatica.'},
+  {name:'Isometria estensori del polso', dur:'3×30-45 sec', how:'Polso in estensione contro resistenza leggera (o flexbar), avambraccio appoggiato, palmo verso il basso. Tenuta costante, niente strappi.'},
 ];
 
 /* ---------------- storage wrapper (window.storage, no localStorage) ---------------- */
@@ -459,7 +455,12 @@ function confirmSet(){
   if(c.done){
     // avanza alla prossima serie da fare; se l'esercizio è finito, al prossimo esercizio incompleto
     const a=s.log[ui.exId]; const nxt=a.findIndex((x,i)=>i>ix&&!x.done);
-    if(nxt!==-1){ ui.setIx[ui.exId]=nxt; }
+    if(nxt!==-1){
+      // riporta i valori appena inseriti alla serie successiva dello STESSO esercizio
+      // (di solito carico/rip si ripetono o cambiano di poco); cambiando esercizio non si copia
+      const ncell=a[nxt]; ncell.l=c.l; ncell.r=c.r; if(e.rir) ncell.rir=c.rir;
+      ui.setIx[ui.exId]=nxt; persist();
+    }
     else {
       const order=EXS.map(x=>x.id); const start=order.indexOf(ui.exId);
       let moved=false;
@@ -562,7 +563,7 @@ function renderGuida(){
       <ul>
         <li>Ascolta i tendini: un leggero fastidio muscolare è ok; un dolore puntiforme ai gomiti o alla colonna dice di abbassare il peso o ridurre il ROM.</li>
         <li>Sii maniacale sul tempo: i 3 secondi di discesa sono la tua “terapia” preventiva per i gomiti.</li>
-        <li>Gomiti: prese neutre/martello e carico mirato sugli estensori del polso a fine seduta. Se compare fastidio tendineo, riduci il carico ma non sospendere.</li>
+        <li>Gomiti: prese neutre/martello durante la seduta e carico mirato sugli estensori del polso <b>nei giorni di mobilità</b> (~3×/sett, vedi tab Mobilità). Se compare fastidio tendineo, riduci il carico ma non sospendere.</li>
       </ul>
       <p class="muted" style="text-align:left;margin-top:4px">Programma educativo su principi di scienza dell’allenamento, non un piano riabilitativo medico. Per dolori nuovi o persistenti, fermati e fai rivalutare.</p>
     </div>`;
@@ -572,10 +573,15 @@ function renderGuida(){
 function renderMobilita(){
   const v=document.getElementById('view');
   const items=MOBILITY.map(w=>`<div class="refitem"><div class="refname">${w.name}</div><div class="refmeta">${w.dur}</div></div>`).join('');
+  const wrist=WRIST.map(w=>`<div class="refitem"><div class="refname">${w.name}</div><div class="refmeta">${w.dur}</div><div class="refbody">${w.how}</div></div>`).join('');
   v.innerHTML=`
     <div class="htitle">Mobilità come obiettivo</div>
     <p class="refintro">La mobilità migliora con l’<b>esposizione frequente</b>, non con sessioni occasionali. Routine da casa: <b>8-10 min, 3-5×/settimana</b>, nei giorni off o la sera. Solo consultazione — non si registra qui.</p>
     ${items}
+
+    <div class="htitle">Polso / avambraccio · ~3×/sett</div>
+    <p class="refintro">Spostato qui dalla seduta di forza (che sforava i 75′): falli <b>nei giorni di mobilità, ~3×/settimana</b>, a fresco. Il tendine guarito si rinforza con <b>carico costante e progressivo</b>, non evitandolo: eseguili con regolarità e ogni 1-2 settimane prova ad aumentare di pochissimo. Se compare fastidio riduci il carico, <b>non sospendere</b>. Consultazione — la progressione qui la tieni a memoria.</p>
+    ${wrist}
 
     <div class="htitle">Cervicale · micro-pause al terminale</div>
     <div class="refcard">
