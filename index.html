@@ -263,12 +263,12 @@ const WARMUP=[
   {name:'Y-T-W a corpo libero', dur:'10 / lettera', how:'In piedi, busto leggermente flesso, schiena dritta. Braccia a formare una Y, poi una T, poi una W. Contrai forte le scapole a ogni movimento.'},
 ];
 const MOBILITY=[
-  {name:'Posizione del bambino con allungo laterale', dur:'60 sec'},
-  {name:'Cat-camel (gatto-cammello)', dur:'10 cicli lenti'},
-  {name:'90/90 anche con rotazioni', dur:'8 / lato'},
-  {name:'Apertura toracica su foam roller', dur:'60 sec'},
-  {name:'Scapular wall slides (slittamenti al muro)', dur:'10 rip'},
-  {name:'Allungo flessori dell’anca in affondo', dur:'45 sec / lato'},
+  {name:'Posizione del bambino con allungo laterale', dur:'60 sec', how:'In ginocchio, siediti sui talloni e allunga le braccia in avanti, palmi a terra, fronte verso il pavimento. Da qui “cammina” con entrambe le mani verso destra finché senti tirare lungo il fianco e il gran dorsale sinistro; resta e respira, poi cambia lato. Bacino fermo sui talloni, allungo lieve e mai doloroso. Decomprime la zona lombare e allunga la catena laterale e il gran dorsale.'},
+  {name:'Cat-camel (gatto-cammello)', dur:'10 cicli lenti', how:'A carponi, mani sotto le spalle e ginocchia sotto le anche. Espira arrotondando lentamente la colonna verso il soffitto (gatto), poi inspira invertendo vertebra per vertebra in leggera estensione (cammello). Movimento lento e segmentario, senza forzare gli estremi. È lo stesso movimento del riscaldamento in palestra: ripeterlo va benissimo, qui mobilizza tutta la colonna a freddo.'},
+  {name:'90/90 anche con rotazioni', dur:'8 / lato', how:'Seduto a terra: una gamba davanti piegata a 90° (tibia perpendicolare al busto) e l’altra di lato, anch’essa a 90°. Busto eretto. Ruota entrambe le ginocchia da un lato all’altro facendole passare radenti al pavimento, controllando il movimento con le anche. Allena la rotazione interna ed esterna dell’anca, tipicamente rigida in chi sta seduto a lungo.'},
+  {name:'Apertura toracica su foam roller', dur:'60 sec', how:'Foam roller a terra in orizzontale; sdraiati sopra appoggiandolo sotto le scapole (tratto dorsale, non lombare). Mani dietro la nuca a sostenere il collo. Lascia cadere all’indietro la parte alta della schiena estendendoti sul rullo, poi spostalo di un paio di dita più su o più giù per lavorare i vari segmenti. Estende il tratto dorsale e contrasta la cifosi da scrivania. Senza foam roller: stesso esercizio con un asciugamano arrotolato stretto sotto il dorso — più dolce, ma analogo.'},
+  {name:'Scapular wall slides (slittamenti al muro)', dur:'10 rip', how:'In piedi, schiena al muro: anche, dorso e nuca a contatto. Braccia a “W”, con dorso delle mani e gomiti appoggiati alla parete. Falli scivolare verso l’alto fino a una “Y” mantenendo il contatto il più possibile, poi torna giù stringendo le scapole in basso. Fermati dove la spalla resta comoda: conta il ROM indolore, non l’altezza raggiunta. Mobilità scapolare e dorsale per la postura.'},
+  {name:'Allungo flessori dell’anca in affondo', dur:'45 sec / lato', how:'In affondo, ginocchio posteriore a terra (metti qualcosa sotto se dà fastidio). Porta il bacino in retroversione (pube verso l’ombelico, “coda fra le gambe”) e spingi dolcemente l’anca in avanti finché senti tirare davanti alla coscia e all’inguine della gamba dietro. Busto eretto. Allunga lo psoas, accorciato dallo stare seduti: fondamentale per scaricare la zona lombare.'},
 ];
 const WRIST=[
   {name:'Estensione di polso', dur:'2×15 · tempo 3-1-3', how:'Avambraccio appoggiato su panca o coscia, polso oltre il bordo, palmo verso il basso, peso/manubrio leggerissimo. Estendi il polso in 3 secondi, tieni 1, scendi in 3. L’obiettivo è lo stimolo al collagene, non la fatica.'},
@@ -572,7 +572,7 @@ function renderGuida(){
 /* ---------------- render: MOBILITÀ ---------------- */
 function renderMobilita(){
   const v=document.getElementById('view');
-  const items=MOBILITY.map(w=>`<div class="refitem"><div class="refname">${w.name}</div><div class="refmeta">${w.dur}</div></div>`).join('');
+  const items=MOBILITY.map(w=>`<div class="refitem"><div class="refname">${w.name}</div><div class="refmeta">${w.dur}</div><div class="refbody">${w.how}</div></div>`).join('');
   const wrist=WRIST.map(w=>`<div class="refitem"><div class="refname">${w.name}</div><div class="refmeta">${w.dur}</div><div class="refbody">${w.how}</div></div>`).join('');
   v.innerHTML=`
     <div class="htitle">Mobilità come obiettivo</div>
@@ -593,7 +593,7 @@ function renderMobilita(){
       <ul>
         <li>Stretch sempre <b>lieve</b>, mai dolore (vale il semaforo del dolore della Guida).</li>
         <li>Sugli <b>scapular wall slides</b> fermati dove la spalla è comoda: ROM indolore.</li>
-        <li>Senza <b>foam roller</b>: usa un asciugamano arrotolato sotto la colonna o l’apertura sullo spigolo di una porta.</li>
+        <li>Senza <b>foam roller</b>: l’apertura toracica si fa con un asciugamano arrotolato stretto sotto il dorso (vedi la descrizione dell’esercizio) — più dolce ma analogo.</li>
         <li>Il cat-camel è lo stesso movimento del riscaldamento in palestra: ripeterlo va benissimo, l’esposizione frequente è un pregio.</li>
       </ul>
     </div>`;
