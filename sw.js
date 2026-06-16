@@ -1,7 +1,7 @@
 /* Diario · Fase 1 — service worker
    - I DATI sono in localStorage, NON nella cache: aggiornare la cache non tocca lo storico.
    - Per pubblicare una nuova versione dell'app: cambia CACHE (es. v2) e ripubblica. */
-const CACHE = 'diario-v3';
+const CACHE = 'diario-v4';
 const ASSETS = [
   'index.html',
   'manifest.webmanifest',

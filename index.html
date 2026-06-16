@@ -168,6 +168,29 @@
   #infobody p{font-size:13.5px;color:var(--ink-1);line-height:1.58;margin:13px 0 0}
   .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--panel-2);border:1px solid var(--line);color:var(--ink-0);padding:11px 18px;border-radius:12px;font-size:13.5px;z-index:50;opacity:0;transition:.2s;pointer-events:none}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* ---- termina seduta (footer) + recap ---- */
+  .endbtn{width:100%;min-height:50px;margin-top:14px;border-radius:14px;background:transparent;border:1px solid var(--line);color:var(--ink-1);font-size:14.5px;font-weight:600;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .06s}
+  .endbtn.ready{border-color:var(--done);color:var(--done);background:color-mix(in srgb,var(--done) 10%,transparent)}
+  .endbtn:active{transform:scale(.99)}
+  .recap{margin-top:14px}
+
+  /* ---- rest timer (persistente, fuori dal #view) ---- */
+  .rest{position:fixed;left:0;right:0;bottom:calc(70px + env(safe-area-inset-bottom));z-index:29;display:none;pointer-events:none}
+  .rest.on{display:block}
+  .rest-in{max-width:520px;margin:0 auto;padding:0 14px}
+  .restbar{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--active);border-radius:14px;padding:8px 8px 8px 14px;box-shadow:0 8px 26px rgba(0,0,0,.5);position:relative;overflow:hidden}
+  .restbar.fin{border-color:var(--done)}
+  .rest-prog{position:absolute;left:0;bottom:0;height:3px;background:var(--active);width:100%;transition:width .25s linear}
+  .restbar.fin .rest-prog{background:var(--done)}
+  .rest-col{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;cursor:pointer}
+  .rest-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);line-height:1}
+  .restbar.fin .rest-lbl{color:var(--done)}
+  .rest-time{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:26px;font-weight:500;color:var(--ink-0);line-height:1.05;letter-spacing:.01em}
+  .rest-adj{width:46px;height:42px;border-radius:11px;background:var(--panel);border:1px solid var(--line);font-family:var(--mono);font-size:13px;color:var(--ink-1);flex:0 0 auto;display:grid;place-items:center;transition:transform .06s}
+  .rest-adj:active{transform:scale(.92)}
+  .rest-x{width:40px;height:42px;border-radius:11px;background:transparent;color:var(--ink-2);font-size:15px;flex:0 0 auto;display:grid;place-items:center}
+  body.rest-on .toast{bottom:calc(140px + env(safe-area-inset-bottom))}
+
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
   .hidden{display:none!important}
 </style>
@@ -209,6 +232,21 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<div class="rest" id="rest" aria-live="polite">
+  <div class="rest-in">
+    <div class="restbar" id="restbar">
+      <div class="rest-prog" id="rest-prog"></div>
+      <div class="rest-col" id="rest-reset" title="Tocca per ripartire da 2:00">
+        <span class="rest-lbl" id="rest-lbl">Recupero</span>
+        <span class="rest-time" id="rest-time">2:00</span>
+      </div>
+      <button class="rest-adj" id="rest-minus" aria-label="meno 15 secondi">−15</button>
+      <button class="rest-adj" id="rest-plus" aria-label="più 15 secondi">+15</button>
+      <button class="rest-x" id="rest-x" aria-label="Chiudi timer">✕</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ---------------- config: la scheda Fase 1 (definitiva) ---------------- */
 const EXS = [
@@ -245,9 +283,9 @@ const EXS = [
    note:'Molto leggere · conduci il movimento coi gomiti',
    desc:['Manubri molto leggeri, in piedi. Solleva le braccia lateralmente fino all’altezza delle spalle, gomito leggermente flesso, conduci il movimento con i gomiti. Salita controllata, discesa lenta.',
    'Perché: deltoide laterale, utile in ottica ipertrofia futura della spalla. Opzionale: è la prima cosa da togliere se sei a corto di tempo.']},
-  {id:'triceps',name:'Triceps pushdown elastico', tag:'opz', sets:2, target:'15–20 rep', load:false, rep:'rep', rir:false,
+  {id:'triceps',name:'Triceps pushdown al cavo', tag:'opz', sets:2, target:'15–20 rep', load:true, step:2.5, unit:'kg', rep:'rep', rir:false,
    note:'Lento, soprattutto in risalita',
-   desc:['Elastico ancorato in alto, gomiti ai fianchi fermi. Estendi gli avambracci verso il basso, lento e controllato, soprattutto nel ritorno.',
+   desc:['Corda o barra al cavo alto, gomiti ai fianchi fermi. Estendi gli avambracci verso il basso, lento e controllato, soprattutto nel ritorno.',
    'Perché: lavoro complementare sul tricipite a bassissimo carico articolare. Opzionale.']},
 ];
 const EXMAP = Object.fromEntries(EXS.map(e=>[e.id,e]));
@@ -358,6 +396,22 @@ function renderOggi(){
     bindWarm();
     document.getElementById('start').onclick=startSession; return;
   }
+  if(s.done){
+    let total=0,done=0; CORE.forEach(id=>{ total+=EXMAP[id].sets; done+=exDone(s,id); });
+    let rows='';
+    EXS.forEach(x=>{ const a=s.log[x.id]||[]; const d=a.filter(z=>z.done); if(!d.length)return;
+      const ex=EXMAP[x.id];
+      const vals=d.map(z=> ex.load? `${fmt(z.l)}×${fmt(z.r)}${ex.rir?'@'+z.rir:''}` : `${fmt(z.r)}${ex.rir?'@'+z.rir:''}`).join('  ');
+      rows+=`<div class="hex"><span class="hn">${ex.name}</span><span class="hv">${vals}</span></div>`; });
+    v.innerHTML=`<div class="card">
+      <div class="exhead"><div class="exname">Seduta conclusa</div></div>
+      <div class="extarget">${dShort(s.date)} · ${done}/${total} serie completate</div>
+      <div class="recap">${rows||'<div class="muted" style="text-align:left;margin-top:0">Nessuna serie registrata in questa seduta.</div>'}</div>
+      <button class="endbtn" id="reopen">↺ Riapri seduta</button>
+    </div>`;
+    document.getElementById('reopen').onclick=()=>{ const c=curSession(); if(c)c.done=false; persist(); toast('Seduta riaperta'); render(); };
+    return;
+  }
   // strip
   let strip='';
   EXS.forEach(e=>{
@@ -403,6 +457,8 @@ function renderOggi(){
   });
   const done=cell.done;
   const total=e.sets;
+  let coreT=0,coreD=0; CORE.forEach(id=>{ coreT+=EXMAP[id].sets; coreD+=exDone(s,id); });
+  const allCore=coreD>=coreT;
   v.innerHTML=warmupHTML()+`<div class="strip">${strip}</div>
     <div class="card">
       <div class="exhead">
@@ -415,7 +471,8 @@ function renderOggi(){
       ${last}
       <div class="sets">${sc}</div>
       <button class="confirm ${done?'re':''}" id="confirm">${done?'↻ Aggiorna serie '+(ix+1):'✓ Segna serie '+(ix+1)+'/'+total}</button>
-    </div>`;
+    </div>
+    <button class="endbtn ${allCore?'ready':''}" id="endsession">${allCore?'✓ Termina seduta':'Termina seduta'}</button>`;
   bindOggi();
 }
 
@@ -432,6 +489,7 @@ function bindOggi(){
   document.querySelectorAll('.num.tap').forEach(n=>n.onclick=()=>openEdit(n.dataset.edit));
   const inf=document.getElementById('exinfo'); if(inf) inf.onclick=()=>openInfo(ui.exId);
   document.getElementById('confirm').onclick=confirmSet;
+  const endb=document.getElementById('endsession'); if(endb) endb.onclick=finishSession;
 }
 function setCell(patch){ const s=curSession(); const ix=curSetIx(ui.exId); Object.assign(s.log[ui.exId][ix],patch); persist(); }
 function stepVal(act){
@@ -470,8 +528,15 @@ function confirmSet(){
       if(!moved){ ui.setIx[ui.exId]=ix; } // tutto fatto: resta qui
     }
     toast('Serie registrata');
+    startRest(); // recupero parte da solo appena confermi la serie
   }
   render();
+}
+function finishSession(){
+  const s=curSession(); if(!s){ toast('Nessuna seduta in corso'); return; }
+  let ct=0,cd=0; CORE.forEach(id=>{ ct+=EXMAP[id].sets; cd+=exDone(s,id); });
+  if(cd<ct && !confirm(`Hai completato ${cd}/${ct} serie principali. Vuoi terminare comunque la seduta?`)) return;
+  s.done=true; hideRest(); persist(); ui.tab='oggi'; window.scrollTo(0,0); toast('Seduta conclusa'); render();
 }
 
 /* ---------------- render: STORICO ---------------- */
@@ -622,7 +687,7 @@ function openInfo(exId){
   sheet.classList.remove('on'); scrim.classList.add('on'); infosheet.classList.add('on');
 }
 document.getElementById('gear').onclick=openMenu; scrim.onclick=closeSheet;
-document.getElementById('mi-finish').onclick=()=>{ const s=curSession(); if(s)s.done=true; persist(); closeSheet(); toast('Seduta archiviata'); render(); };
+document.getElementById('mi-finish').onclick=()=>{ closeSheet(); finishSession(); };
 document.getElementById('mi-export').onclick=()=>{
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -634,6 +699,59 @@ document.getElementById('file').onchange=ev=>{ const f=ev.target.files[0]; if(!f
 document.getElementById('mi-reset').onclick=()=>{ if(confirm('Cancellare tutte le sedute registrate? L’azione non è reversibile.')){ state={sessions:[]}; ui.setIx={}; persist(); closeSheet(); toast('Dati cancellati'); render(); } };
 
 let tt; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),1600); }
+
+/* ---------------- rest timer (recupero) ---------------- */
+const REST_DEFAULT=120; // 2 min, dentro il range 90-120s della Fase 1
+const rest={endAt:0, dur:REST_DEFAULT, tick:null, hideT:null, finished:false, ctx:null};
+const restEl=document.getElementById('rest');
+const restBarEl=document.getElementById('restbar');
+const restProgEl=document.getElementById('rest-prog');
+const restTimeEl=document.getElementById('rest-time');
+const restLblEl=document.getElementById('rest-lbl');
+function fmtClock(sec){ if(sec<0)sec=0; const m=Math.floor(sec/60),s=sec%60; return m+':'+String(s).padStart(2,'0'); }
+function restRemaining(){ return Math.max(0,Math.round((rest.endAt-Date.now())/1000)); }
+function restDraw(){ const rem=restRemaining(); restTimeEl.textContent=fmtClock(rem);
+  restProgEl.style.width=(rest.dur>0?Math.max(0,Math.min(100,rem/rest.dur*100)):0)+'%'; }
+function startRest(){
+  clearTimeout(rest.hideT); clearInterval(rest.tick);
+  rest.finished=false; rest.dur=REST_DEFAULT; rest.endAt=Date.now()+REST_DEFAULT*1000;
+  restBarEl.classList.remove('fin'); restLblEl.textContent='Recupero';
+  restEl.classList.add('on'); document.body.classList.add('rest-on');
+  try{ if(!rest.ctx){ const AC=window.AudioContext||window.webkitAudioContext; if(AC) rest.ctx=new AC(); }
+    if(rest.ctx&&rest.ctx.state==='suspended') rest.ctx.resume(); }catch(e){} // sblocca l'audio nel gesto utente
+  restDraw();
+  rest.tick=setInterval(()=>{ restDraw(); if(restRemaining()<=0) restFinish(); },250);
+}
+function restFinish(){
+  if(rest.finished) return;
+  rest.finished=true; clearInterval(rest.tick); rest.tick=null;
+  restBarEl.classList.add('fin'); restLblEl.textContent='Pronto'; restTimeEl.textContent='0:00'; restProgEl.style.width='0%';
+  try{ navigator.vibrate && navigator.vibrate([180,80,180]); }catch(e){}
+  restBeep();
+  clearTimeout(rest.hideT); rest.hideT=setTimeout(hideRest,12000);
+}
+function hideRest(){ clearInterval(rest.tick); rest.tick=null; clearTimeout(rest.hideT);
+  rest.finished=false; restEl.classList.remove('on'); document.body.classList.remove('rest-on'); }
+function adjustRest(delta){
+  if(!restEl.classList.contains('on')||rest.finished) return;
+  rest.endAt+=delta*1000; const rem=restRemaining();
+  if(rem>rest.dur) rest.dur=rem;          // se estendi oltre i 2:00, la barra si adegua
+  if(rem<=0){ restFinish(); return; }
+  restDraw();
+}
+function restBeep(){
+  try{ const ctx=rest.ctx; if(!ctx) return;
+    const blip=(t,f)=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='sine'; o.frequency.value=f;
+      o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.18,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+.2);
+      o.start(t); o.stop(t+.22); };
+    const now=ctx.currentTime; blip(now,880); blip(now+.26,1175);
+  }catch(e){}
+}
+document.getElementById('rest-x').onclick=hideRest;
+document.getElementById('rest-plus').onclick=()=>adjustRest(15);
+document.getElementById('rest-minus').onclick=()=>adjustRest(-15);
+document.getElementById('rest-reset').onclick=startRest;
 
 ['oggi','storico','guida','mobilita'].forEach(t=>{ document.getElementById('tab-'+t).onclick=()=>{ ui.tab=t; window.scrollTo(0,0); render(); }; });
 
