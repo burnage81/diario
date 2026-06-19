@@ -221,6 +221,7 @@
   <div class="grab"></div>
   <h3>Seduta</h3>
   <button class="mi" id="mi-finish"><span class="mic">✓</span>Termina seduta di oggi</button>
+  <button class="mi" id="mi-cancel"><span class="mic">⌦</span>Annulla seduta di oggi</button>
   <button class="mi" id="mi-export"><span class="mic">↧</span>Esporta dati (backup)</button>
   <button class="mi" id="mi-import"><span class="mic">↥</span>Importa dati</button>
   <button class="mi dn" id="mi-reset"><span class="mic">⌫</span>Cancella tutto</button>
@@ -342,20 +343,22 @@ function curSession(){ const t=todayKey(); return state.sessions.find(s=>s.date=
 function fmt(n){ if(n===null||n===undefined||n==='') return '—'; return String(n).replace('.',','); }
 function dShort(iso){ const d=new Date(iso+'T00:00'); return d.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'}); }
 
-function lastValue(exId,ix){ // ultimo valore loggato per quell'esercizio/serie nelle sedute passate
+function lastFinalSet(exId){ // dove hai chiuso l'ultima volta: ultima serie completata nella seduta più recente
   const t=todayKey();
   for(let i=state.sessions.length-1;i>=0;i--){ const s=state.sessions[i];
     if(s.date===t) continue;
-    const arr=s.log[exId]; if(arr&&arr[ix]&&arr[ix].done) return arr[ix];
+    const arr=s.log[exId]; if(!arr) continue;
+    for(let j=arr.length-1;j>=0;j--){ if(arr[j]&&arr[j].done) return arr[j]; }
   }
   return null;
 }
+function isEmptySession(s){ return !Object.values(s&&s.log||{}).some(arr=>Array.isArray(arr)&&arr.some(x=>x&&x.done)); }
 function startSession(){
   const ex={}; EXS.forEach(e=>{
-    ex[e.id]=Array.from({length:e.sets},(_,i)=>{
-      const lv=lastValue(e.id,i);
-      return {l:lv?lv.l:(e.load?0:null), r:lv?lv.r:'', rir:lv?lv.rir:(e.rir?2:null), done:false};
-    });
+    const lv=lastFinalSet(e.id); // tutte le serie partono da dove hai chiuso l'ultima volta
+    ex[e.id]=Array.from({length:e.sets},()=>(
+      {l:lv?lv.l:(e.load?0:null), r:lv?lv.r:'', rir:lv?lv.rir:(e.rir?2:null), done:false}
+    ));
   });
   state.sessions.push({id:Date.now(),date:todayKey(),log:ex,done:false});
   ui.exId=EXS[0].id; ui.setIx={};
@@ -422,7 +425,7 @@ function renderOggi(){
       <span class="cn">${e.name}${tg?' ':''}${tg}</span><span class="dots">${dots}</span></button>`;
   });
   const e=EXMAP[ui.exId]; const a=s.log[ui.exId]; const ix=curSetIx(ui.exId); const cell=a[ix];
-  const lv=lastValue(ui.exId,ix);
+  const lv=lastFinalSet(ui.exId);
 
   // metrics
   let metrics='';
@@ -534,9 +537,19 @@ function confirmSet(){
 }
 function finishSession(){
   const s=curSession(); if(!s){ toast('Nessuna seduta in corso'); return; }
+  if(isEmptySession(s)){ // niente da salvare: si annulla, non si conclude una seduta vuota
+    if(confirm('Questa seduta non ha nessuna serie registrata. Vuoi annullarla?')) cancelSession();
+    return;
+  }
   let ct=0,cd=0; CORE.forEach(id=>{ ct+=EXMAP[id].sets; cd+=exDone(s,id); });
   if(cd<ct && !confirm(`Hai completato ${cd}/${ct} serie principali. Vuoi terminare comunque la seduta?`)) return;
   s.done=true; hideRest(); persist(); ui.tab='oggi'; window.scrollTo(0,0); toast('Seduta conclusa'); render();
+}
+function cancelSession(){ // elimina la seduta di oggi (in corso) — niente sedute fantasma
+  const t=todayKey(); const i=state.sessions.findIndex(s=>s.date===t);
+  if(i===-1){ toast('Nessuna seduta da annullare'); return; }
+  state.sessions.splice(i,1); ui.setIx={}; ui.exId=EXS[0].id; hideRest();
+  persist(); ui.tab='oggi'; window.scrollTo(0,0); toast('Seduta annullata'); render();
 }
 
 /* ---------------- render: STORICO ---------------- */
@@ -688,6 +701,10 @@ function openInfo(exId){
 }
 document.getElementById('gear').onclick=openMenu; scrim.onclick=closeSheet;
 document.getElementById('mi-finish').onclick=()=>{ closeSheet(); finishSession(); };
+document.getElementById('mi-cancel').onclick=()=>{ closeSheet();
+  const s=curSession(); if(!s||s.done){ toast('Nessuna seduta in corso'); return; }
+  if(confirm('Eliminare la seduta di oggi? Tutte le serie registrate oggi andranno perse.')) cancelSession();
+};
 document.getElementById('mi-export').onclick=()=>{
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -756,7 +773,11 @@ document.getElementById('rest-reset').onclick=startRest;
 ['oggi','storico','guida','mobilita'].forEach(t=>{ document.getElementById('tab-'+t).onclick=()=>{ ui.tab=t; window.scrollTo(0,0); render(); }; });
 
 /* ---------------- boot ---------------- */
-(async()=>{ const saved=await store.load(); if(saved&&Array.isArray(saved.sessions)) state=saved; render(); })();
+(async()=>{ const saved=await store.load(); if(saved&&Array.isArray(saved.sessions)) state=saved;
+  const before=state.sessions.length;
+  state.sessions=state.sessions.filter(s=>!isEmptySession(s)); // scarta le sedute vuote (mai loggate)
+  if(state.sessions.length!==before) persist();
+  render(); })();
 
 /* ---------------- PWA: service worker (solo standalone via http/https, fuori da Claude) ---------------- */
 if(location.protocol.startsWith('http') && 'serviceWorker' in navigator){
